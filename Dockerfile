@@ -29,6 +29,12 @@ RUN chmod -R +x /etc/my_init.d
 ADD /sources /sources
 EXPOSE 80 3306
 
+RUN groupmod -g 9999 nogroup && \
+    usermod -g 9999 nobody && \
+    usermod -u 9999 nobody && \
+    usermod -g 9999 sync && \
+    usermod -g 9999 _apt
+
 # Clean up APT when done.
 RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
