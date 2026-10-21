@@ -165,6 +165,23 @@ while IFS='|' read -r pkg version; do
         unpatched=1
     fi
 done < "$work/image.php"
+# The published patched version (gate.conf) is required independently of the
+# image label, so a release cannot pass with a lower PHP_MIN_VERSION.
+if [ -n "${GATE_PHP_PATCHED_MIN:-}" ]; then
+    below_patched=0
+    while IFS='|' read -r pkg version; do
+        if ! vercmp "$version" ge "$GATE_PHP_PATCHED_MIN"; then
+            [ "$mode" = trial ] || fail "$pkg $version is older than the patched $GATE_PHP_SOURCE $GATE_PHP_PATCHED_MIN"
+            below_patched=1
+            unpatched=1
+        fi
+    done < "$work/image.php"
+    if [ "$below_patched" = 0 ]; then
+        echo "every $GATE_PHP_SOURCE package is at least the patched $GATE_PHP_PATCHED_MIN"
+    fi
+elif [ "$mode" = release ]; then
+    fail "gate.conf must set GATE_PHP_PATCHED_MIN for a release"
+fi
 if [ -n "${GATE_PHP_VERSION_SUFFIX:-}" ]; then
     if grep -v -F -- "$GATE_PHP_VERSION_SUFFIX" "$work/image.php" | grep -q .; then
         fail "some $GATE_PHP_SOURCE packages are not from the local rebuild ($GATE_PHP_VERSION_SUFFIX)"

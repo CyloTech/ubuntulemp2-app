@@ -32,9 +32,12 @@ context_path=${context_path%/}
 # shellcheck source=gate.conf
 . "$release_dir/gate.conf"
 
-builder=appbox@builder.grant.appboxes.co
+# The dedicated Appbox builder (builder1, Docker 29 with buildx, logged in to
+# repo.cylo.net). The old builder.grant.appboxes.co:12246 is no longer used.
+builder=appbox@builder1.builder.appboxes.co
+builder_port=10112
 ssh_opts=(-i /Users/rid/.ssh/appbox_ubuntuvps2_webtop -o IdentitiesOnly=yes -o BatchMode=yes
-          -o ConnectTimeout=10 -o StrictHostKeyChecking=yes)
+          -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30)
 
 slug=$GATE_IMAGE_NAME
 tag=$GATE_TAG
@@ -70,7 +73,7 @@ cleanup() {
     case "$stage" in /private/tmp/cylo-app-build.??????) rm -rf "$stage" ;; esac
     case "$remote_dir" in
         "/home/appbox/builds/$slug.$tag".[[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]])
-            ssh -p 12246 "${ssh_opts[@]}" "$builder" "rm -rf '$remote_dir'" \
+            ssh -p "$builder_port" "${ssh_opts[@]}" "$builder" "rm -rf '$remote_dir'" \
                 || echo "clean up $builder:$remote_dir by hand" >&2
             ;;
     esac
@@ -88,14 +91,14 @@ archive_sha=$(shasum -a 256 "$archive" | awk '{print $1}')
 echo "context.tgz sha256 $archive_sha"
 
 remote_prefix="/home/appbox/builds/$slug.$tag"
-remote_dir=$(ssh -p 12246 "${ssh_opts[@]}" "$builder" "mktemp -d '$remote_prefix.XXXXXX'")
+remote_dir=$(ssh -p "$builder_port" "${ssh_opts[@]}" "$builder" "mktemp -d '$remote_prefix.XXXXXX'")
 case "$remote_dir" in
     "$remote_prefix".[[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]]) ;;
     *) remote_dir=; fail "unexpected builder directory" ;;
 esac
 echo "builder directory $remote_dir"
-scp -q -P 12246 "${ssh_opts[@]}" "$archive" "$builder:$remote_dir/context.tgz"
-ssh -p 12246 "${ssh_opts[@]}" "$builder" \
+scp -q -P "$builder_port" "${ssh_opts[@]}" "$archive" "$builder:$remote_dir/context.tgz"
+ssh -p "$builder_port" "${ssh_opts[@]}" "$builder" \
     "cd '$remote_dir' && printf '%s  context.tgz\n' '$archive_sha' | sha256sum -c - && mkdir context && tar xzf context.tgz -C context"
 
 build_args=()
@@ -104,15 +107,15 @@ if [ "$mode" = trial ]; then
         case "$arg" in *[!A-Za-z0-9._+=:~-]*) fail "invalid trial build arg: $arg" ;; esac
         build_args+=("--build-arg '$arg'")
     done
-    ssh -p 12246 "${ssh_opts[@]}" "$builder" \
+    ssh -p "$builder_port" "${ssh_opts[@]}" "$builder" \
         "cd '$remote_dir/context' && \
-        docker build --builder default --platform linux/amd64 --progress=plain ${build_args[*]+${build_args[*]}} -t '$image_ref' . && \
+        docker build --builder default --no-cache --platform linux/amd64 --progress=plain ${build_args[*]+${build_args[*]}} -t '$image_ref' . && \
         GATE_REGISTRY_REF='$release_ref' ./release/verify-image.sh '$image_ref'"
     echo "TRIAL PASSED: $image_ref from $commit (not pushed)"
 else
-    ssh -p 12246 "${ssh_opts[@]}" "$builder" \
+    ssh -p "$builder_port" "${ssh_opts[@]}" "$builder" \
         "cd '$remote_dir/context' && \
-        docker build --builder default --platform linux/amd64 --progress=plain -t '$image_ref' . && \
+        docker build --builder default --no-cache --platform linux/amd64 --progress=plain -t '$image_ref' . && \
         ./release/verify-image.sh '$image_ref' && \
         docker push '$image_ref' && \
         docker buildx imagetools inspect '$image_ref' | sed -n 's/^Digest: *//p'"

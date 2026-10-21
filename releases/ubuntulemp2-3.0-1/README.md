@@ -17,7 +17,9 @@ curl -s http://security.ubuntu.com/ubuntu/dists/noble-security/universe/binary-a
   | gzip -dc | grep -A8 '^Package: php8.3-fpm$' | grep '^Version'
 ```
 
-Use the version the USN names (it must be greater than `8.3.6-0ubuntu0.24.04.12`) as
+Ubuntu published php8.3 `8.3.6-0ubuntu0.24.04.13` for CVE-2026-109618 and
+CVE-2026-109619; the Dockerfile and `GATE_PHP_PATCHED_MIN` in gate.conf
+require it. Use the version the USN names (it must be greater than `8.3.6-0ubuntu0.24.04.12`) as
 PHP_MIN_VERSION. The binaries reach security.ubuntu.com a little after the
 source is published; the second command shows when they are there.
 
@@ -34,7 +36,8 @@ releases/ubuntulemp2-3.0-1/release/builder-release.sh release
 ```
 
 `builder-release.sh` refuses uncommitted or unpushed work, archives this
-directory from the pushed commit, builds on the Appbox builder with
+directory from the pushed commit, builds on the Appbox builder
+(appbox@builder1.builder.appboxes.co, port 10112) with `--no-cache` and
 `--platform linux/amd64`, runs `release/verify-image.sh` and pushes only if
 the gate passes, then prints the pushed digest. `builder-release.sh trial`
 does the same as a local `local/<image>-trial:<tag>` image with the trial

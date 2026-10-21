@@ -8,7 +8,7 @@
 FROM repo.cylo.net/ubuntulemp2@sha256:3897de3627f7b2d6eb5397eb0c73e6cb5ff1b58a402dfcb713449a333bee2acc
 
 ARG PHP_SOURCE_PACKAGE=php8.3
-ARG PHP_MIN_VERSION=UNSET
+ARG PHP_MIN_VERSION=8.3.6-0ubuntu0.24.04.13
 LABEL net.cylo.php-source-package="${PHP_SOURCE_PACKAGE}" \
       net.cylo.php-min-version="${PHP_MIN_VERSION}"
 
