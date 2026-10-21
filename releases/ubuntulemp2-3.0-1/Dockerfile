@@ -12,6 +12,8 @@ ARG PHP_MIN_VERSION=8.3.6-0ubuntu0.24.04.13
 LABEL net.cylo.php-source-package="${PHP_SOURCE_PACKAGE}" \
       net.cylo.php-min-version="${PHP_MIN_VERSION}"
 
+# --force-unsafe-io only skips dpkg's per-file fsync during the build (the
+# layer is committed afterwards); the installed files are the same.
 RUN set -eu; \
     [ "$PHP_MIN_VERSION" != UNSET ] || { echo "Set PHP_MIN_VERSION to the patched $PHP_SOURCE_PACKAGE version" >&2; exit 1; }; \
     export DEBIAN_FRONTEND=noninteractive; \
@@ -20,7 +22,8 @@ RUN set -eu; \
         | awk -F'|' -v src="$PHP_SOURCE_PACKAGE" '$1 ~ /^ii/ && $3 == src {print $2}'); \
     [ -n "$pkgs" ]; \
     apt-get install -y --only-upgrade --no-install-recommends \
-        -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold $pkgs; \
+        -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \
+        -o Dpkg::Options::=--force-unsafe-io $pkgs; \
     for pkg in $pkgs; do \
         version=$(dpkg-query -W -f='${Version}' "$pkg"); \
         dpkg --compare-versions "$version" ge "$PHP_MIN_VERSION" \
